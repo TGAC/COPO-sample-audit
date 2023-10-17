@@ -95,7 +95,7 @@ def process_changes(doc):
     filter['action'] = action_type
     filter['manifest_id'] = manifest_id
     filter['profile_id'] = profile_id
-    filter['sample_id'] = sample_id
+    filter['copo_id'] = sample_id
     filter['sample_type'] = sample_type
 
     # Determine if COPO i.e.'system' or COPO user  i.e. 'user' performed the update
