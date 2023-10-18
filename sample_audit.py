@@ -55,7 +55,7 @@ def process_changes(doc):
         pytz.timezone('Europe/London')).replace(microsecond=0) or datetime_default_value
 
     # Format (terminal) display of json document for legibility
-    # datetime_format = '%y-%m-%d %H:%M:%S'
+    # datetime_format = '%Y-%m-%d %H:%M:%S'
     # doc_json = doc
     # doc_json['documentKey']['_id'] = str(
     #     doc_json.get('documentKey', dict()).get('_id', str()))
