@@ -80,7 +80,6 @@ def process_changes(doc):
     removedFields = doc.get('updateDescription',
                             dict()).get('removedFields', list())
 
-    profile_id = fullDocumentAfterChange.get('profile_id', str())
     sample_id = documentID
     manifest_id = fullDocumentAfterChange.get('manifest_id', str())
     sample_type = fullDocumentAfterChange.get('sample_type', str())
@@ -94,7 +93,6 @@ def process_changes(doc):
     filter['collection_name'] = collection_name
     filter['action'] = action_type
     filter['manifest_id'] = manifest_id
-    filter['profile_id'] = profile_id
     filter['copo_id'] = sample_id
     filter['sample_type'] = sample_type
 
@@ -116,7 +114,6 @@ def process_changes(doc):
 
             print(f'\'system\' updated the document!')
 
-            updated_by = 'ei.copo@earlham.ac.uk'
             update_type = 'system'
 
             # Update the 'updated_by' field and 'date_modified' field in the 'SampleCollection' using the replace_method
@@ -185,7 +182,6 @@ def process_changes(doc):
 
         for field in removedFields:
             removal_log['field'] = field
-            removal_log['removed_by'] = 'ei.copo@earlham@ac.uk'
             removal_log['removal_type'] = 'system'
             removal_log['time_removed'] = time_updated
 
@@ -206,7 +202,6 @@ def process_changes(doc):
         for element in truncatedArrays:
             truncated_log['field'] = element.get('field', str())
             truncated_log['newSize'] = element.get('newSize', int())
-            truncated_log['truncated_by'] = 'ei.copo@earlham@ac.uk'
             truncated_log['truncated_type'] = 'system'
             truncated_log['time_truncated'] = time_updated
 
