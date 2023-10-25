@@ -19,12 +19,10 @@ RUN apt-get update && apt-get install -y \
     pip install --upgrade pip && \
     apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-COPY ./requirements/ /tmp/requirements/
-RUN pip install --use-deprecated=legacy-resolver -r /tmp/requirements/dev.txt
-
 RUN mkdir /copo
 WORKDIR /copo
 COPY . /copo/
+RUN pip install --use-deprecated=legacy-resolver -r /copo/requirement.txt
 
 ENTRYPOINT ["bash","-c","python /copo/sample_audit.py"]
 
