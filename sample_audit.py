@@ -80,9 +80,15 @@ def process_changes(doc):
     removedFields = doc.get('updateDescription',
                             dict()).get('removedFields', list())
 
-    sample_id = documentID
+    biosampleAccession = fullDocumentAfterChange.get('biosampleAccession', str())
+    sample_id = documentID # aka copo_id
     manifest_id = fullDocumentAfterChange.get('manifest_id', str())
+    public_name = fullDocumentAfterChange.get('public_name', str())
     sample_type = fullDocumentAfterChange.get('sample_type', str())
+    sraAccession = fullDocumentAfterChange.get('sraAccession', str())
+    rack_or_plate_id = fullDocumentAfterChange.get('RACK_OR_PLATE_ID', str())
+    specimen_id = fullDocumentAfterChange.get('SPECIMEN_ID', str())
+    tube_or_well_id = fullDocumentAfterChange.get('TUBE_OR_WELL_ID', str())
 
     outdatedFields = {
         field: fullDocumentBeforeChange.get(field, str()) for field in updatedFields if field in fullDocumentBeforeChange}
@@ -90,12 +96,9 @@ def process_changes(doc):
     # Assemble the main information/filter for the 'AuditCollection'
     filter = dict()
     filter['_id'] = documentID
-    filter['collection_name'] = collection_name
     filter['action'] = action_type
-    filter['manifest_id'] = manifest_id
-    filter['copo_id'] = sample_id
-    filter['sample_type'] = sample_type
-
+    filter['collection_name'] = collection_name
+        
     # Determine if COPO i.e.'system' or COPO user  i.e. 'user' performed the update
     if updatedFields and outdatedFields:
         if 'date_modified' in updatedFields or 'time_updated' in updatedFields and fullDocumentAfterChange.get('update_type', str()) == 'user':
@@ -151,9 +154,21 @@ def process_changes(doc):
                     field, str())
                 update_log['updated_value'] = updatedFields.get(
                     field, str())
-                update_log['updated_by'] = updated_by
+
+                # Add 'updated_by' field only if the update was not performed by 'system'
+                if updated_by:
+                    update_log['updated_by'] = updated_by
+                    
                 update_log['update_type'] = update_type
                 update_log['time_updated'] = time_updated
+                update_log['biosampleAccession'] = biosampleAccession
+                update_log['copo_id'] = sample_id
+                update_log['manifest_id'] = manifest_id
+                update_log['sample_type'] = sample_type
+                update_log['sraAccession'] = sraAccession
+                update_log['RACK_OR_PLATE_ID'] = rack_or_plate_id
+                update_log['SPECIMEN_ID'] = specimen_id
+                update_log['TUBE_OR_WELL_ID'] = tube_or_well_id
 
         # Merge dictionaries
         update_filter = filter | {'update_log': {'$exists': True}}
