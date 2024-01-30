@@ -173,6 +173,8 @@ def process_changes(doc):
         # Merge dictionaries
         update_filter = filter | {'update_log': {'$exists': True}}
 
+        duplicate_filter_check = filter | {'update_log': {'$elemMatch': update_log}}
+
         # If the number of documents in the 'AuditCollection' that match the filter is 0,
         # insert a document into the 'AuditCollection' based on the filter criteria
         # and set 'update_log' to an empty list
@@ -180,10 +182,15 @@ def process_changes(doc):
                 update_filter, limit=1, maxTimeMS=1000) == 0:
             mongoDB['AuditCollection'].update_one(
                 filter, {'$set': {'update_log': list()}}, upsert=True)
-
-        # Populate the 'update_log'
-        mongoDB['AuditCollection'].update_one(
-            {'_id': documentID}, {'$push': {'update_log': update_log}})
+        elif mongoDB['AuditCollection'].count_documents(
+                duplicate_filter_check, maxTimeMS=1000) >= 1:
+            # Avoid duplicate entries in the 'update_log' field
+            # by ignoring them and not adding them to the 'update_log' list
+            pass
+        else:
+            # Populate the 'update_log'
+            mongoDB['AuditCollection'].update_one(
+                {'_id': documentID}, {'$push': {'update_log': update_log}})
 
     # Record fields that have been removed from the document
     if removedFields:
