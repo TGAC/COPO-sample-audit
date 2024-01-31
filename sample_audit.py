@@ -1,3 +1,4 @@
+from bson import ObjectId
 from datetime import datetime
 
 import json
@@ -35,7 +36,7 @@ mongoDB = mongoClient['copo_mongo']
 
 
 def process_changes(doc):
-    documentID = doc.get('documentKey', dict()).get('_id', str())
+    documentID = doc.get('documentKey', dict()).get('_id', ObjectId())
     collection_name = doc.get('ns', dict()).get('coll', str())
     action_type = doc.get('operationType', str())
     datetime_default_value = datetime.min
@@ -56,16 +57,16 @@ def process_changes(doc):
 
     # Format (terminal) display of json document for legibility
     # datetime_format = '%Y-%m-%d %H:%M:%S'
-    # doc_json = doc
-    # doc_json['documentKey']['_id'] = str(
-    #     doc_json.get('documentKey', dict()).get('_id', str()))
-    # doc_json['clusterTime'] = doc_json.get('clusterTime', datetime_default_value).strftime(
-    #     datetime_format) or datetime_default_value.strftime(datetime_format)
-    # doc_json['wallTime'] = doc_json.get(
-    #     'wallTime', datetime_default_value).strftime(datetime_format) or datetime_default_value.strftime(datetime_format)
+    doc_json = doc
+    doc_json['documentKey']['_id'] = str(
+        doc_json.get('documentKey', dict()).get('_id', str()))
+    doc_json['clusterTime'] = doc_json.get('clusterTime', datetime_default_value).strftime(
+        datetime_format) or datetime_default_value.strftime(datetime_format)
+    doc_json['wallTime'] = doc_json.get(
+        'wallTime', datetime_default_value).strftime(datetime_format) or datetime_default_value.strftime(datetime_format)
 
-    # print(
-    #     f'\nDocument:\n {json.dumps(doc_json, indent=4, sort_keys=True,default=str)}\n')
+    print(
+        f'\nDocument:\n {json.dumps(doc_json, indent=4, sort_keys=True,default=str)}\n')
 
     # Exclude fields from the 'update_log'
     excluded_fields = [
@@ -98,7 +99,12 @@ def process_changes(doc):
     filter['_id'] = documentID
     filter['action'] = action_type
     filter['collection_name'] = collection_name
-        
+    filter['copo_id'] = sample_id
+    filter['manifest_id'] = manifest_id
+    filter['sample_type'] = sample_type
+    filter['RACK_OR_PLATE_ID'] = rack_or_plate_id
+    filter['TUBE_OR_WELL_ID'] = tube_or_well_id
+    
     # Determine if COPO i.e.'system' or COPO user  i.e. 'user' performed the update
     if updatedFields and outdatedFields:
         if 'date_modified' in updatedFields or 'time_updated' in updatedFields and fullDocumentAfterChange.get('update_type', str()) == 'user':
@@ -144,10 +150,15 @@ def process_changes(doc):
 
         # Create an 'update_log' dictionary
         update_log = dict()
+        output = list()
 
         for field in updatedFields:
             if field in excluded_fields or 'changelog' in field:
-                continue
+                # Skip fields that are not required in the 'update_log' and go to the next iteration
+                pass 
+            elif outdatedFields.get(field, str()) == updatedFields.get(field, str()):
+                # Do not record fields that have the same outdated and updated values
+                pass 
             else:
                 update_log['field'] = field
                 update_log['outdated_value'] = outdatedFields.get(
@@ -156,24 +167,18 @@ def process_changes(doc):
                     field, str())
 
                 # Add 'updated_by' field only if the update was not performed by 'system'
-                if updated_by:
+                if updated_by and update_type != 'system':
                     update_log['updated_by'] = updated_by
                     
                 update_log['update_type'] = update_type
                 update_log['time_updated'] = time_updated
-                update_log['biosampleAccession'] = biosampleAccession
-                update_log['copo_id'] = sample_id
-                update_log['manifest_id'] = manifest_id
-                update_log['sample_type'] = sample_type
-                update_log['sraAccession'] = sraAccession
-                update_log['RACK_OR_PLATE_ID'] = rack_or_plate_id
-                update_log['SPECIMEN_ID'] = specimen_id
-                update_log['TUBE_OR_WELL_ID'] = tube_or_well_id
-
+                
+                output.append(update_log)
+                
         # Merge dictionaries
         update_filter = filter | {'update_log': {'$exists': True}}
 
-        duplicate_filter_check = filter | {'update_log': {'$elemMatch': update_log}}
+        #duplicate_filter_check = filter | {'update_log': {'$elemMatch': update_log}}
 
         # If the number of documents in the 'AuditCollection' that match the filter is 0,
         # insert a document into the 'AuditCollection' based on the filter criteria
@@ -182,21 +187,22 @@ def process_changes(doc):
                 update_filter, limit=1, maxTimeMS=1000) == 0:
             mongoDB['AuditCollection'].update_one(
                 filter, {'$set': {'update_log': list()}}, upsert=True)
-        elif mongoDB['AuditCollection'].count_documents(
-                duplicate_filter_check, maxTimeMS=1000) >= 1:
+        # elif mongoDB['AuditCollection'].count_documents(
+        #        duplicate_filter_check, maxTimeMS=1000) >= 1:
             # Avoid duplicate entries in the 'update_log' field
             # by ignoring them and not adding them to the 'update_log' list
-            pass
+        #    pass
         else:
             # Populate the 'update_log'
             mongoDB['AuditCollection'].update_one(
-                {'_id': documentID}, {'$push': {'update_log': update_log}})
+                {'_id': documentID}, {'$push': {'update_log': {'$each': output}}})
 
     # Record fields that have been removed from the document
     if removedFields:
         # Merge dictionaries
         removal_filter = filter | {'removedFields': {'$exists': True}}
         removal_log = dict()
+        output = list()
 
         if not mongoDB['AuditCollection'].find(removal_filter):
             mongoDB['AuditCollection'].update_one(
@@ -207,15 +213,18 @@ def process_changes(doc):
             removal_log['removal_type'] = 'system'
             removal_log['time_removed'] = time_updated
 
+            output.append(removal_log)
+
         # Update the log of removed fields in the collection
         mongoDB['AuditCollection'].update_one(
-            {'_id': documentID}, {'$push': {'removal_log': removal_log}})
+            {'_id': documentID}, {'$push': {'removal_log': {'$each': output}}})
 
     # Record fields have been truncated in the document
     if truncatedArrays:
         # Merge dictionaries
         truncated_filter = filter | {'truncatedArrays': {'$exists': True}}
         truncated_log = dict()
+        output = list()
 
         if not mongoDB['AuditCollection'].find(truncated_filter):
             mongoDB['AuditCollection'].update_one(
@@ -227,9 +236,11 @@ def process_changes(doc):
             truncated_log['truncated_type'] = 'system'
             truncated_log['time_truncated'] = time_updated
 
+            output.append(truncated_log)
+
         # Update the log of removed fields in the collection
         mongoDB['AuditCollection'].update_one(
-            {'_id': documentID}, {'$push': {'truncated_log': truncated_log}})
+            {'_id': documentID}, {'$push': {'truncated_log': {'$each': output}}})
 
 
 # Record updates whenever an update is performed on a collection
