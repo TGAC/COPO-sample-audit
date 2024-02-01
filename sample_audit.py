@@ -143,7 +143,11 @@ def process_changes(doc):
 
             # Merge dictionaries
             replacement = replace_filter | {
-                'date_modified': time_updated, 'time_updated': time_updated, 'updated_by': updated_by, 'update_type': update_type}
+                'date_modified': time_updated, 'time_updated': time_updated, 'update_type': update_type}
+            
+            # Add 'updated_by' field only if the update was not performed by 'system'
+            if updated_by and update_type != 'system':
+                    replacement['updated_by'] = updated_by
 
             mongoDB['SampleCollection'].replace_one(
                 replace_filter, replacement)
