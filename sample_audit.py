@@ -76,16 +76,16 @@ def process_changes(doc):
     outdatedFields = {
         field: fullDocumentBeforeChange.get(field, str()) for field in updatedFields if field in fullDocumentBeforeChange}
 
-    # Assemble the main information/filter for the 'AuditCollection'
-    filter = dict()
-    filter['_id'] = documentID
-    filter['action'] = action_type
-    filter['collection_name'] = collection_name
-    filter['copo_id'] = sample_id
-    filter['manifest_id'] = manifest_id
-    filter['sample_type'] = sample_type
-    filter['RACK_OR_PLATE_ID'] = rack_or_plate_id
-    filter['TUBE_OR_WELL_ID'] = tube_or_well_id
+    # Assemble the main information that will be inserted in the 'AuditCollection'
+    insert_record = dict()
+    insert_record['_id'] = documentID
+    insert_record['action'] = action_type
+    insert_record['collection_name'] = collection_name
+    insert_record['copo_id'] = sample_id
+    insert_record['manifest_id'] = manifest_id
+    insert_record['sample_type'] = sample_type
+    insert_record['RACK_OR_PLATE_ID'] = rack_or_plate_id
+    insert_record['TUBE_OR_WELL_ID'] = tube_or_well_id
     
     # Determine if COPO i.e.'system' or COPO user  i.e. 'user' performed the update
     if updatedFields and outdatedFields:
@@ -161,32 +161,15 @@ def process_changes(doc):
                 
                 output.append(update_log)
                 
-        # Merge dictionaries
-        update_filter = filter | {'update_log': {'$exists': True}}
-
-        #duplicate_filter_check = filter | {'update_log': {'$elemMatch': update_log}}
-
-        # If the number of documents in the 'AuditCollection' that match the filter is 0,
-        # insert a document into the 'AuditCollection' based on the filter criteria
-        # and set 'update_log' to an empty list
-        if mongoDB['AuditCollection'].count_documents(
-                update_filter, limit=1, maxTimeMS=1000) == 0:
-            mongoDB['AuditCollection'].update_one(
-                filter, {'$set': {'update_log': list()}}, upsert=True)
-        else:
-            # Populate the 'update_log'
-            mongoDB['AuditCollection'].update_one(
-                {'_id': documentID}, {'$push': {'update_log': {'$each': output}}})
-
+        # Finds document and performs update
+        # If the document is not found, the document is 
+        # created with the 'update_log' details
+        mongoDB['AuditCollection'].find_one_and_update(
+                {'_id': documentID}, {'$push': {'update_log': {'$each': output}}, "$setOnInsert": insert_record}, upsert=True)
+        
     # Record fields that have been removed from the document
     if removedFields:
-        # Merge dictionaries
-        removal_filter = filter | {'removedFields': {'$exists': True}}
         output = list()
-
-        if not mongoDB['AuditCollection'].find(removal_filter):
-            mongoDB['AuditCollection'].update_one(
-                removal_filter, {'$set': {'removedFields': list()}}, upsert=True)
 
         for field in removedFields:
             removal_log = dict()
@@ -196,19 +179,16 @@ def process_changes(doc):
 
             output.append(removal_log)
 
-        # Update the log of removed fields in the collection
-        mongoDB['AuditCollection'].update_one(
-            {'_id': documentID}, {'$push': {'removal_log': {'$each': output}}})
+        # Update the log of removed fields in the collection by 
+        # finding the document and performing the update
+        # If the document is not found, the document 
+        # is created with the details
+        mongoDB['AuditCollection'].find_one_and_update(
+            {'_id': documentID}, {'$push': {'removal_log': {'$each': output}},"$setOnInsert": insert_record}, upsert=True)
 
     # Record fields have been truncated in the document
     if truncatedArrays:
-        # Merge dictionaries
-        truncated_filter = filter | {'truncatedArrays': {'$exists': True}}
         output = list()
-
-        if not mongoDB['AuditCollection'].find(truncated_filter):
-            mongoDB['AuditCollection'].update_one(
-                truncated_filter, {'$set': {'truncatedArrays': list()}}, upsert=True)
 
         for element in truncatedArrays:
             truncated_log = dict()
@@ -219,9 +199,12 @@ def process_changes(doc):
 
             output.append(truncated_log)
 
-        # Update the log of removed fields in the collection
-        mongoDB['AuditCollection'].update_one(
-            {'_id': documentID}, {'$push': {'truncated_log': {'$each': output}}})
+        # Update the log of truncated fields in the collection by 
+        # finding the document and performing the update
+        # If the document is not found, the document 
+        # is created with the details
+        mongoDB['AuditCollection'].find_one_and_update(
+            {'_id': documentID}, {'$push': {'truncated_log': {'$each': output}},"$setOnInsert": insert_record}, upsert=True)
 
 
 # Record updates whenever an update is performed on a collection
