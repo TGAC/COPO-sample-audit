@@ -89,7 +89,7 @@ def process_changes(doc):
     
     # Determine if COPO i.e.'system' or COPO user  i.e. 'user' performed the update
     if updatedFields and outdatedFields:
-        if 'date_modified' in updatedFields or 'time_updated' in updatedFields and fullDocumentAfterChange.get('update_type', str()) == 'user':
+        if 'update_type' in updatedFields:
             # print(f'\n\'user\' updated the document!\n')
 
             updated_by = fullDocumentAfterChange.get('updated_by', str())
@@ -105,40 +105,44 @@ def process_changes(doc):
 
             # print(f'\'system\' updated the document!')
 
+            updated_by = 'system'
             update_type = 'system'
 
-            # Update the 'updated_by' field and 'date_modified' field in the 'SampleCollection' using the replace_method
-            if 'date_modified' in fullDocumentAfterChange:
-                fullDocumentAfterChange.pop('date_modified')
+        # Update the 'updated_by' field and 'date_modified' field in the 'SampleCollection' using the replace_method
+        data = dict()
 
-            if 'time_updated' in fullDocumentAfterChange:
-                fullDocumentAfterChange.pop('time_updated')
+        if 'date_modified' not in updatedFields:
+            fullDocumentAfterChange.pop('date_modified')
+            data['date_modified'] = time_updated
 
-            if 'updated_by' in fullDocumentAfterChange:
-                fullDocumentAfterChange.pop('updated_by')
+        if 'time_updated' not in updatedFields:
+            fullDocumentAfterChange.pop('time_updated')
+            data['time_updated'] = time_updated
 
-            if 'update_type' in fullDocumentAfterChange:
-                fullDocumentAfterChange.pop('update_type')
+        if 'updated_by' not in updatedFields:
+            fullDocumentAfterChange.pop('updated_by')
+            data['updated_by'] = updated_by
 
+        if 'update_type' not in updatedFields:
+            fullDocumentAfterChange.pop('update_type')
+            data['update_type'] = update_type
+
+        if data:
             # Replace document in the 'SampleCollection'
             replace_filter = fullDocumentAfterChange
 
             # Merge dictionaries
-            replacement = replace_filter | {
-                'date_modified': time_updated, 'time_updated': time_updated, 'update_type': update_type}
+            replacement = replace_filter | data                  
             
-            # Add 'updated_by' field only if the update was not performed by 'system'
-            if  update_type != 'system':
-                    replacement['updated_by'] = updated_by
-
+            # Replace the document in the 'SampleCollection'
             mongoDB['SampleCollection'].replace_one(
-                replace_filter, replacement)
+                    documentID, replacement)
 
         # Create an 'update_log' dictionary
         output = list()
 
         for field in updatedFields:
-            if field in excluded_fields or 'changelog' in field:
+            if field in excluded_fields:
                 # Skip fields that are not required in the 'update_log' and go to the next iteration
                 pass 
             elif outdatedFields.get(field, str()) == updatedFields.get(field, str()):
@@ -152,9 +156,7 @@ def process_changes(doc):
                 update_log['updated_value'] = updatedFields.get(
                     field, str())
 
-                # Add 'updated_by' field only if the update was not performed by 'system'
-                if update_type != 'system':
-                    update_log['updated_by'] = updated_by
+                update_log['updated_by'] = updated_by
                     
                 update_log['update_type'] = update_type
                 update_log['time_updated'] = time_updated
