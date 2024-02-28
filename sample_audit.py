@@ -51,8 +51,8 @@ def process_changes(doc):
     doc_json['documentKey']['_id'] = str(
         doc_json.get('documentKey', dict()).get('_id', str()))
 
-    # print(
-    #    f'\nDocument:\n {json.dumps(doc_json, indent=4, sort_keys=True,default=str)}\n')
+    print(
+        f'\nDocument:\n {json.dumps(doc_json, indent=4, sort_keys=True,default=str)}\n')
 
     # Exclude fields from the 'update_log'
     excluded_fields = [
@@ -90,10 +90,13 @@ def process_changes(doc):
     # Determine if COPO i.e.'system' or COPO user  i.e. 'user' performed the update
     if updatedFields and outdatedFields:
         if 'update_type' in updatedFields:
-            # print(f'\n\'user\' updated the document!\n')
 
             updated_by = fullDocumentAfterChange.get('updated_by', str())
             update_type = fullDocumentAfterChange.get('update_type', str())
+            #print(f'\n\'{update_type}\' updated the document!\n')
+
+            if update_type.startswith('tempuser_'):
+                update_type = "user"
         else:
             '''
              NB: The  'replace_one' method is used to replace the entire document in the 'SampleCollection' with the initial document but with modified fields
@@ -122,10 +125,9 @@ def process_changes(doc):
         if 'updated_by' not in updatedFields:
             fullDocumentAfterChange.pop('updated_by')
             data['updated_by'] = updated_by
-
-        if 'update_type' not in updatedFields:
-            fullDocumentAfterChange.pop('update_type')
-            data['update_type'] = update_type
+       
+        fullDocumentAfterChange.pop('update_type')
+        data['update_type'] = update_type
 
         if data:
             # Replace document in the 'SampleCollection'
@@ -136,7 +138,7 @@ def process_changes(doc):
             
             # Replace the document in the 'SampleCollection'
             mongoDB['SampleCollection'].replace_one(
-                    documentID, replacement)
+                    {"_id":documentID}, replacement)
 
         # Create an 'update_log' dictionary
         output = list()
