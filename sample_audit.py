@@ -90,7 +90,7 @@ def process_changes(doc):
     # Determine if COPO i.e.'system' or COPO user  i.e. 'user' performed the update
     if updatedFields and outdatedFields:
         if 'update_type' in updatedFields:
-
+            
             updated_by = fullDocumentAfterChange.get('updated_by', str())
             update_type = fullDocumentAfterChange.get('update_type', str())
             #print(f'\n\'{update_type}\' updated the document!\n')
@@ -98,14 +98,6 @@ def process_changes(doc):
             if update_type.startswith('tempuser_'):
                 update_type = "user"
         else:
-            '''
-             NB: The  'replace_one' method is used to replace the entire document in the 'SampleCollection' with the initial document but with modified fields
-             instead of the 'update_one' method which updates the specified fields document in the 'SampleCollection'
-             This is done to ensure that the update action is not performed since the watch/ChangeStream on the 'SampleCollection'
-             considers the last update performed on the collection as the current state of the document
-             i.e. if the 'SampleCollection' is updated with the 'system' information, this 'overwrites' the prior update to the fields in the collection
-            '''
-
             # print(f'\'system\' updated the document!')
 
             updated_by = 'system'
@@ -134,7 +126,15 @@ def process_changes(doc):
             replace_filter = fullDocumentAfterChange
 
             # Merge dictionaries
-            replacement = replace_filter | data                  
+            replacement = replace_filter | data
+            
+            '''
+             NB: The  'replace_one' method is used to replace the entire document in the 'SampleCollection' with the initial document but with modified fields
+             instead of the 'update_one' method which updates the specified fields document in the 'SampleCollection'
+             This is done to ensure that the update action is not performed since the watch/ChangeStream on the 'SampleCollection'
+             considers the last update performed on the collection as the current state of the document
+             i.e. if the 'SampleCollection' is updated with the 'system' information, this 'overwrites' the prior update to the fields in the collection
+            '''
             
             # Replace the document in the 'SampleCollection'
             mongoDB['SampleCollection'].replace_one(
