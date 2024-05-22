@@ -46,6 +46,9 @@ def process_changes(doc):
     # Get document after update(s) has been completed
     fullDocumentAfterChange = doc.get('fullDocument', dict())
 
+    # Get original document when no value has been popped from the document
+    fullDocumentAfterChangeImage = fullDocumentAfterChange
+
     # Format (terminal) display of json document for legibility
     doc_json = doc
     doc_json['documentKey']['_id'] = str(
@@ -138,7 +141,7 @@ def process_changes(doc):
             
             # Replace the document in the 'SampleCollection'
             mongoDB['SampleCollection'].replace_one(
-                    {"_id":documentID}, replacement)
+                    fullDocumentAfterChangeImage, replacement)
 
         # Create an 'update_log' dictionary
         output = list()
