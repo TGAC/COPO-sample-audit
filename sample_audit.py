@@ -76,9 +76,6 @@ def process_changes(doc):
     rack_or_plate_id = fullDocumentAfterChange.get('RACK_OR_PLATE_ID', str())
     tube_or_well_id = fullDocumentAfterChange.get('TUBE_OR_WELL_ID', str())
 
-    outdatedFields = {
-        field: fullDocumentBeforeChange.get(field, str()) for field in updatedFields if field in fullDocumentBeforeChange}
-
     # Assemble the main information that will be inserted in the 'AuditCollection'
     insert_record = dict()
     insert_record['_id'] = documentID
@@ -92,7 +89,8 @@ def process_changes(doc):
     
     # Determine if COPO i.e.'system' or COPO user  i.e. 'user' performed the update
     is_changed = False
-    if updatedFields and outdatedFields:
+    if updatedFields:
+
         if 'update_type' in updatedFields:
             
             updated_by = fullDocumentAfterChange.get('updated_by', str())
@@ -139,23 +137,20 @@ def process_changes(doc):
         for field in updatedFields:
             if field in excluded_fields:
                 # Skip fields that are not required in the 'update_log' and go to the next iteration
-                pass 
-            elif outdatedFields.get(field, str()) == updatedFields.get(field, str()):
-                # Do not record fields that have the same outdated and updated values
-                pass 
-            else:
+                continue 
+
+            outdateValue = fullDocumentBeforeChange.get(field, str())
+            updatedValue = updatedFields.get(field, str())
+
+            # Do not record fields that have the same outdated and updated values
+            if outdateValue != updatedValue:
                 update_log = dict()
                 update_log['field'] = field
-                update_log['outdated_value'] = outdatedFields.get(
-                    field, str())
-                update_log['updated_value'] = updatedFields.get(
-                    field, str())
-
+                update_log['outdated_value'] = outdateValue
+                update_log['updated_value'] = updatedValue
                 update_log['updated_by'] = updated_by
-                    
                 update_log['update_type'] = update_type
                 update_log['time_updated'] = time_updated
-                
                 output.append(update_log)
                 
         # Finds document and performs update
