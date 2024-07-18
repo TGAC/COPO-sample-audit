@@ -91,6 +91,7 @@ def process_changes(doc):
     insert_record['TUBE_OR_WELL_ID'] = tube_or_well_id
     
     # Determine if COPO i.e.'system' or COPO user  i.e. 'user' performed the update
+    is_changed = False
     if updatedFields and outdatedFields:
         if 'update_type' in updatedFields:
             
@@ -100,37 +101,26 @@ def process_changes(doc):
 
             if update_type.startswith('tempuser_'):
                 update_type = "user"
+                fullDocumentAfterChange.update({'update_type': update_type})
+                is_changed = True
         else:
             # print(f'\'system\' updated the document!')
-
+            after_update_by = fullDocumentAfterChange.get('updated_by', str())
+            after_update_type = fullDocumentAfterChange.get('update_type', str())
             updated_by = 'system'
             update_type = 'system'
 
-        # Update the 'updated_by' field and 'date_modified' field in the 'SampleCollection' using the replace_method
-        data = dict()
-
-        if 'date_modified' not in updatedFields:
-            fullDocumentAfterChange.pop('date_modified')
-            data['date_modified'] = time_updated
-
-        if 'time_updated' not in updatedFields:
-            fullDocumentAfterChange.pop('time_updated')
-            data['time_updated'] = time_updated
-
-        if 'updated_by' not in updatedFields:
-            fullDocumentAfterChange.pop('updated_by')
-            data['updated_by'] = updated_by
-       
-        fullDocumentAfterChange.pop('update_type')
-        data['update_type'] = update_type
-
-        if data:
-            # Replace document in the 'SampleCollection'
-            replace_filter = fullDocumentAfterChange
-
-            # Merge dictionaries
-            replacement = replace_filter | data
+            if after_update_by != 'system' or after_update_type != 'system':
+                is_changed = True
+                fullDocumentAfterChange.update({'update_type': update_type, 'updated_by': updated_by})
             
+        # Update the 'updated_by' field and 'date_modified' field in the 'SampleCollection' using the replace_method
+        if 'date_modified' in updatedFields:
+            #fullDocumentAfterChange.update({'date_modified': time_updated})
+            #is_changed = True
+            time_updated = fullDocumentAfterChange.get('date_modified', time_updated)
+
+        if is_changed:
             '''
              NB: The  'replace_one' method is used to replace the entire document in the 'SampleCollection' with the initial document but with modified fields
              instead of the 'update_one' method which updates the specified fields document in the 'SampleCollection'
@@ -141,8 +131,8 @@ def process_changes(doc):
             
             # Replace the document in the 'SampleCollection'
             mongoDB['SampleCollection'].replace_one(
-                    fullDocumentAfterChangeImage, replacement)
-
+                    fullDocumentAfterChangeImage, fullDocumentAfterChange)
+     
         # Create an 'update_log' dictionary
         output = list()
 
